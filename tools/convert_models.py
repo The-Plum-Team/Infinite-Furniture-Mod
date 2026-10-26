@@ -1,20 +1,20 @@
-"""Builds the mod's GeckoLib and item resources from the Blockbench models in art/.
+"""Builds the mod's model resources from the Blockbench models in art/.
 
 Usage: python3 tools/convert_models.py [--check]
 
 For each art/wardrobe/wardrobe_<shape>.bbmodel (Blockbench, Bedrock entity format) it writes:
 
-- assets/infinitefurniture/geo/wardrobe_<shape>.geo.json (Bedrock geometry 1.12.0),
-- assets/infinitefurniture/animations/wardrobe_<shape>.animation.json, with the animations
-  renamed to animation.wardrobe.<open|close|open_idle> so every shape shares one controller,
+- assets/infinitefurniture/furniture/wardrobe_<shape>.json, read by the mod's FurnitureModel:
+  the bones (pivot, rotation, parent) with their cubes (from, to and a [u0, v0, u1, v1] pixel
+  rectangle per face) and the open, close and open_idle animations as keyframe lists;
 - assets/infinitefurniture/textures/block/wardrobe_<shape>.png, the embedded texture.
+
+Everything stays in Blockbench's own scene coordinates and keyframe values, which are
+Minecraft's block coordinates in pixels with the model's floor centre at the origin; the mod
+applies Blockbench's display conventions when it draws them.
 
 The small wardrobe also becomes a plain Java block model (models/item/wardrobe.json) for the
 item, so the inventory shows the real cabinet without a custom item renderer.
-
-Blockbench keeps Bedrock models mirrored in X, and exports a down face with its V flipped;
-this does the same: origin.x = -to.x, pivot x negated, rotation y and z negated (in keyframes
-too, where positions negate x).
 With --check it only reports whether the committed files are up to date.
 """
 import base64
@@ -26,7 +26,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ART = os.path.join(ROOT, "art", "wardrobe")
 ASSETS = os.path.join(ROOT, "common", "src", "main", "resources", "assets", "infinitefurniture")
 SHAPES = ("small", "tall", "wide", "big")
-LOOP = {"hold": "hold_on_last_frame", "loop": True, "once": False}
+FACES = ("north", "east", "south", "west", "up", "down")
 
 
 def num(v):
@@ -34,18 +34,11 @@ def num(v):
     return int(v) if v.is_integer() else round(v, 4)
 
 
-def geometry(model, name):
+def furniture(model, name):
     els = {e["uuid"]: e for e in model["elements"]}
     bones = []
 
     def walk(group, parent):
-        bone = {"name": group["name"], "pivot": [num(-group["origin"][0]), num(group["origin"][1]),
-                                                 num(group["origin"][2])]}
-        if parent:
-            bone["parent"] = parent
-        rot = group.get("rotation")
-        if rot and any(rot):
-            bone["rotation"] = [num(rot[0]), num(-rot[1]), num(-rot[2])]
         cubes = []
         children = []
         for child in group["children"]:
@@ -55,53 +48,42 @@ def geometry(model, name):
             e = els[child]
             if e.get("rotation") and any(e["rotation"]):
                 raise SystemExit(f"{name}: rotated cube {e['name']} is not supported")
-            frm, to = e["from"], e["to"]
-            size = [num(t - f) for f, t in zip(frm, to)]
-            uv = {}
-            for face, d in e["faces"].items():
-                if d.get("texture") is None:
-                    continue
-                u0, v0, u1, v1 = d["uv"]
-                if face == "down":
-                    uv[face] = {"uv": [num(u0), num(v1)], "uv_size": [num(u1 - u0), num(v0 - v1)]}
-                else:
-                    uv[face] = {"uv": [num(u0), num(v0)], "uv_size": [num(u1 - u0), num(v1 - v0)]}
-            cubes.append({"origin": [num(-to[0]), num(frm[1]), num(frm[2])], "size": size, "uv": uv})
-        if cubes:
-            bone["cubes"] = cubes
+            faces = {}
+            for face in FACES:
+                d = e["faces"].get(face)
+                if d and d.get("texture") is not None:
+                    faces[face] = [num(c) for c in d["uv"]]
+            cubes.append({"from": [num(c) for c in e["from"]], "to": [num(c) for c in e["to"]],
+                          "faces": faces})
+        bone = {"name": group["name"], "pivot": [num(c) for c in group["origin"]]}
+        if parent:
+            bone["parent"] = parent
+        if group.get("rotation") and any(group["rotation"]):
+            bone["rotation"] = [num(c) for c in group["rotation"]]
+        bone["cubes"] = cubes
         bones.append(bone)
         for child in children:
             walk(child, group["name"])
 
     for group in model["outliner"]:
         walk(group, None)
-    res = model["resolution"]
-    return {"format_version": "1.12.0", "minecraft:geometry": [{
-        "description": {"identifier": f"geometry.infinitefurniture.{name}",
-                        "texture_width": res["width"], "texture_height": res["height"],
-                        "visible_bounds_width": 4, "visible_bounds_height": 4,
-                        "visible_bounds_offset": [0, 1, 0]},
-        "bones": bones}]}
 
-
-def animations(model):
-    out = {}
+    animations = {}
     for a in model["animations"]:
         short = a["name"].rsplit(".", 1)[-1]
-        bones = {}
+        anim_bones = {}
         for animator in a["animators"].values():
-            channels = bones.setdefault(animator["name"], {})
+            channels = anim_bones.setdefault(animator["name"], {})
             for k in sorted(animator["keyframes"], key=lambda k: k["time"]):
+                if k.get("interpolation", "linear") != "linear":
+                    raise SystemExit(f"{name}: only linear keyframes are supported")
                 p = k["data_points"][0]
-                x, y, z = float(p["x"]), float(p["y"]), float(p["z"])
-                # The same X mirror as the geometry: positions flip x, rotations flip y and z.
-                value = [-x, y, z] if k["channel"] == "position" else [x, -y, -z]
-                channels.setdefault(k["channel"], {})[f"{num(k['time'])}"] = [num(v) + 0 for v in value]
-        anim = {"loop": LOOP[a["loop"]], "bones": bones}
-        if a["length"]:
-            anim["animation_length"] = num(a["length"])
-        out[f"animation.wardrobe.{short}"] = anim
-    return {"format_version": "1.8.0", "animations": out}
+                channels.setdefault(k["channel"], []).append(
+                    [num(k["time"]), num(p["x"]), num(p["y"]), num(p["z"])])
+        animations[short] = {"length": num(a["length"]), "bones": anim_bones}
+
+    res = model["resolution"]
+    return {"texture_size": [res["width"], res["height"]], "bones": bones, "animations": animations}
 
 
 def item_model(model):
@@ -133,8 +115,7 @@ def outputs():
         name = f"wardrobe_{shape}"
         with open(os.path.join(ART, f"{name}.bbmodel"), encoding="utf-8") as f:
             model = json.load(f)
-        files[f"geo/{name}.geo.json"] = json.dumps(geometry(model, name), indent=1) + "\n"
-        files[f"animations/{name}.animation.json"] = json.dumps(animations(model), indent=1) + "\n"
+        files[f"furniture/{name}.json"] = json.dumps(furniture(model, name), indent=1) + "\n"
         src = model["textures"][0]["source"]
         files[f"textures/block/{name}.png"] = base64.b64decode(src.split(",", 1)[1])
         if shape == "small":

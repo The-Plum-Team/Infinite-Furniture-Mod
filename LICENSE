@@ -49,8 +49,8 @@ the copyright holder under these same terms.
 
 THIRD-PARTY CONTENT
 
-This mod depends on, but does not bundle, Architectury API (LGPL-3.0) and
-GeckoLib (MIT), which are distributed under their own licenses. The models and
+This mod depends on, but does not bundle, Architectury API (LGPL-3.0), which
+is distributed under its own license. The models and
 textures in art/ and common/src/main/resources/assets are original work of the
 copyright holder.
 

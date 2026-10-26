@@ -23,8 +23,8 @@ legs.
 ## Loaders
 
 Minecraft 1.20.1 on Fabric (with Fabric API) and Forge. It needs
-[Architectury API](https://modrinth.com/mod/architectury-api) and
-[GeckoLib](https://modrinth.com/mod/geckolib) 4.
+[Architectury API](https://modrinth.com/mod/architectury-api); the furniture is drawn by the mod
+itself, with no rendering library.
 
 ## Building
 
@@ -39,5 +39,6 @@ Gradle runs on Java 21 or newer, which compiles the mod for Java 17 (`--release 
 
 The wardrobes are drawn in Blockbench. `art/wardrobe/*.bbmodel` are the sources, made by the
 scripts in `art/wardrobe/generator/`. `python3 tools/convert_models.py` turns them into the
-GeckoLib geometry, animations and textures under `common/src/main/resources`, plus the item model;
+models with their animations and the textures under `common/src/main/resources`, plus the item
+model;
 `--check` tells whether those are up to date.
