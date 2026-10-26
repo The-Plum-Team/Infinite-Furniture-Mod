@@ -33,7 +33,7 @@ Minecraft 1.20.1 on Fabric (with Fabric API) and Forge. It needs
 ./gradlew :fabric:runShowcase  # development: builds every wardrobe in a test world and photographs it
 ```
 
-Gradle runs on Java 21; the mod targets Java 17.
+Gradle runs on Java 21 or newer, which compiles the mod for Java 17 (`--release 17`); no JDK 17 is needed.
 
 ## Models
 

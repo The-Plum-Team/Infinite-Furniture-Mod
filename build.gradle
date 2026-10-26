@@ -41,10 +41,10 @@ subprojects {
         withSourcesJar()
         sourceCompatibility = JavaVersion.toVersion(rootProject.java_version)
         targetCompatibility = JavaVersion.toVersion(rootProject.java_version)
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(rootProject.java_version as int)
-        }
     }
+
+    // No toolchain: the JDK that runs Gradle (21 or newer) compiles with --release, so the mod
+    // targets Java 17 without a JDK 17 installed, and the development game runs on that JDK.
 
     tasks.withType(JavaCompile).configureEach {
         it.options.encoding = 'UTF-8'
