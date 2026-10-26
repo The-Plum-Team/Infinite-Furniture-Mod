@@ -28,34 +28,25 @@ import net.minecraft.world.level.block.entity.ContainerOpenersCounter;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import software.bernie.geckolib.animatable.GeoBlockEntity;
-import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.core.animation.AnimatableManager;
-import software.bernie.geckolib.core.animation.AnimationController;
-import software.bernie.geckolib.core.animation.RawAnimation;
-import software.bernie.geckolib.core.object.PlayState;
-import software.bernie.geckolib.util.GeckoLibUtil;
 
 /**
  * Every wardrobe block has one, but only the anchor's is used: it holds the contents of the
  * whole wardrobe and is what the renderer draws. Its slots are the size of the biggest wardrobe,
  * so a wardrobe that grows keeps everything; {@link #getContainerSize()} follows the shape.
  */
-public class WardrobeBlockEntity extends BaseContainerBlockEntity implements GeoBlockEntity {
+public class WardrobeBlockEntity extends BaseContainerBlockEntity {
     private static final int MAX_SLOTS = 54;
     private static final int OPEN_EVENT = 1;
-    private static final RawAnimation OPEN = RawAnimation.begin()
-            .thenPlay("animation.wardrobe.open").thenLoop("animation.wardrobe.open_idle");
-    private static final RawAnimation CLOSE = RawAnimation.begin().thenPlay("animation.wardrobe.close");
 
     private NonNullList<ItemStack> items = NonNullList.withSize(MAX_SLOTS, ItemStack.EMPTY);
-    private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     /** Slots in use, synced to clients so the clothes inside follow how full it is. */
     private int filled;
     /** Players looking inside, as the server last reported it (client only). */
     private int viewers;
     /** Whether it has opened since it was loaded, so a closed wardrobe doesn't play "close" on load. */
     private boolean hasOpened;
+    /** Game time of the last change between open and closed, which the animations start from (client only). */
+    private long changedAt;
 
     private final ContainerOpenersCounter openers = new ContainerOpenersCounter() {
         @Override
@@ -97,6 +88,14 @@ public class WardrobeBlockEntity extends BaseContainerBlockEntity implements Geo
 
     public boolean isOpen() {
         return viewers > 0;
+    }
+
+    public boolean hasOpened() {
+        return hasOpened;
+    }
+
+    public long changedAt() {
+        return changedAt;
     }
 
     /** How full it is, from 0 to 1. */
@@ -233,8 +232,12 @@ public class WardrobeBlockEntity extends BaseContainerBlockEntity implements Geo
     @Override
     public boolean triggerEvent(int id, int data) {
         if (id == OPEN_EVENT) {
+            boolean wasOpen = viewers > 0;
             viewers = data;
-            if (data > 0) hasOpened = true;
+            if (wasOpen != data > 0) {
+                changedAt = level != null ? level.getGameTime() : 0;
+                if (data > 0) hasOpened = true;
+            }
             return true;
         }
         return super.triggerEvent(id, data);
@@ -282,21 +285,5 @@ public class WardrobeBlockEntity extends BaseContainerBlockEntity implements Geo
     /** Forge reads this to cull the renderer; the wardrobe can be bigger than its block. */
     public AABB getRenderBoundingBox() {
         return structure().bounds().inflate(0.5);
-    }
-
-    // ------------------------------------------------------------------ animation
-
-    @Override
-    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "doors", 0, state -> {
-            if (isOpen()) return state.setAndContinue(OPEN);
-            if (hasOpened) return state.setAndContinue(CLOSE);
-            return PlayState.STOP;
-        }));
-    }
-
-    @Override
-    public AnimatableInstanceCache getAnimatableInstanceCache() {
-        return cache;
     }
 }
