@@ -5,5 +5,10 @@ run/
 .idea/
 *.iml
 .vscode/
-.architectury-transformer/
+/.architectury-transformer/
 .claude/settings.local.json
+e2e-out/
+_site/
+public-evidence/
+__pycache__/
+*.py[cod]
