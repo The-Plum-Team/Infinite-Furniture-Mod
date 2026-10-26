@@ -1,0 +1,58 @@
+plugins {
+    id 'dev.architectury.loom' version '1.17.480' apply false
+    id 'architectury-plugin' version '3.5.170'
+    id 'com.gradleup.shadow' version '8.3.11' apply false
+}
+
+architectury {
+    minecraft = project.minecraft_version
+}
+
+allprojects {
+    group = rootProject.maven_group
+    version = rootProject.mod_version
+}
+
+subprojects {
+    apply plugin: 'dev.architectury.loom'
+    apply plugin: 'architectury-plugin'
+
+    base {
+        archivesName = "$rootProject.archives_name-$project.name"
+    }
+
+    repositories {
+        maven {
+            name = 'GeckoLib'
+            url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+            content {
+                includeGroupByRegex('software\\.bernie(\\..*)?')
+                includeGroup('com.eliotlash.mclib')
+            }
+        }
+    }
+
+    dependencies {
+        minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
+        mappings loom.officialMojangMappings()
+    }
+
+    java {
+        withSourcesJar()
+        sourceCompatibility = JavaVersion.toVersion(rootProject.java_version)
+        targetCompatibility = JavaVersion.toVersion(rootProject.java_version)
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(rootProject.java_version as int)
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        it.options.encoding = 'UTF-8'
+        it.options.release = rootProject.java_version as int
+    }
+
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+}

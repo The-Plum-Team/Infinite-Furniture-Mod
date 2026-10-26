@@ -1,0 +1,64 @@
+plugins {
+    id 'com.gradleup.shadow'
+}
+
+architectury {
+    platformSetupLoomIde()
+    forge()
+}
+
+configurations {
+    common {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+    compileClasspath.extendsFrom common
+    runtimeClasspath.extendsFrom common
+    developmentForge.extendsFrom common
+
+    shadowBundle {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+
+dependencies {
+    forge "net.minecraftforge:forge:$rootProject.forge_version"
+    modImplementation "dev.architectury:architectury-forge:$rootProject.architectury_api_version"
+    modImplementation "software.bernie.geckolib:geckolib-forge-$rootProject.minecraft_version:$rootProject.geckolib_version"
+    // GeckoLib's Forge jar nests its maths library; the development run needs it on the classpath.
+    forgeRuntimeLibrary 'com.eliotlash.mclib:mclib:20'
+
+    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+    shadowBundle project(path: ':common', configuration: 'transformProductionForge')
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/mods.toml') {
+        expand version: project.version
+    }
+}
+
+shadowJar {
+    configurations = [project.configurations.shadowBundle]
+    archiveClassifier = 'dev-shadow'
+}
+
+remapJar {
+    input.set shadowJar.archiveFile
+}
+
+// Development only: builds every wardrobe in a fresh world, photographs them and quits
+// (see Showcase). Screenshots and the report land in run/showcase/screenshots.
+loom {
+    runs {
+        showcase {
+            client()
+            name = 'Showcase'
+            runDir = 'run/showcase'
+            vmArg '-Dinfinitefurniture.showcase=true'
+            programArgs '--width', '1600', '--height', '900'
+        }
+    }
+}
