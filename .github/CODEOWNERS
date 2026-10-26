@@ -1,0 +1,10 @@
+# Protected control-plane, publication and agent-guidance paths require owner review.
+/.github/ @AkaNebur
+/site/ @AkaNebur
+/scripts/pages/ @AkaNebur
+/scripts/ci/ @AkaNebur
+/AGENTS.md @AkaNebur
+/docs/ai/ @AkaNebur
+/build.gradle @AkaNebur
+/settings.gradle @AkaNebur
+/gradle/ @AkaNebur
